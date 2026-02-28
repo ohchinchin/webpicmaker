@@ -42,3 +42,12 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Investigate & Log files
+models.json
+cat.jpg
+add-env.js
+test-api.js
+test-json.js
+next-create.log
+temp_stage/
