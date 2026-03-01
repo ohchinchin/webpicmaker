@@ -28,7 +28,7 @@ export default function Home() {
 
   // Fallback models if primary fails
   const FALLBACK_MODELS = [
-    'google/gemini-2.0-flash-001:free',
+    'google/gemini-2.0-flash-exp:free',
     'deepseek/deepseek-r1:free',
     'mistralai/mistral-7b-instruct:free',
     'meta-llama/llama-3.3-70b-instruct:free'
