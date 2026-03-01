@@ -26,12 +26,12 @@ export default function Home() {
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [hasChatError, setHasChatError] = useState(false);
 
-  // Fallback models if primary fails
+  // Fallback models if primary fails (Verified Free Models - March 2026)
   const FALLBACK_MODELS = [
     'google/gemini-2.0-flash-exp:free',
-    'deepseek/deepseek-r1:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
     'mistralai/mistral-7b-instruct:free',
-    'meta-llama/llama-3.3-70b-instruct:free'
+    'deepseek/deepseek-r1:free'
   ];
 
   const chatHistoryRef = useRef<HTMLDivElement>(null);

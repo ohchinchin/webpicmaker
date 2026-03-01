@@ -12,3 +12,13 @@
 ## [2026/03/01 15:30:00]
 - 画像読み込みのタイムアウト・エラーハンドリングを追加。
 - OpenRouterの通信失敗に対する自動リトライ・予備モデル切り替え・手動再試行ボタンを実装。
+
+## [2026/03/01 15:45:00]
+- Web検索により OpenRouter の Gemini 2.0 Flash 正式IDを確認。
+- `google/gemini-2.0-flash-exp:free` にモデルIDを修正。
+- 修正内容を Git にプッシュ。
+
+## [2026/03/01 16:00:00]
+- 再度のWeb検索により、2026年3月時点のOpenRouter無料モデル状況を精査。
+- `google/gemini-2.0-flash-exp:free` が正確であることを再確認。
+- `FALLBACK_MODELS` を、より高性能な `meta-llama/llama-3.3-70b-instruct:free` を含むリストに更新。
