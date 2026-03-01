@@ -15,19 +15,28 @@ export async function GET() {
             return NextResponse.json({ error: "Failed to fetch models" }, { status: 500 });
         }
 
-        const data = await res.json();
+        interface OpenRouterModel {
+            id: string;
+            name?: string;
+            pricing?: {
+                prompt: string | number;
+                completion: string | number;
+            };
+        }
+
+        const data = await res.json() as { data: OpenRouterModel[] };
 
         // Filter for free models. OpenRouter usually has pricing.prompt === "0" and completion === "0"
         // or ID contains ":free"
-        const freeModels = data.data.filter((m: any) => {
+        const freeModels = data.data.filter((m: OpenRouterModel) => {
             const isPricingZero = m.pricing &&
                 (m.pricing.prompt === "0" || m.pricing.prompt === 0) &&
                 (m.pricing.completion === "0" || m.pricing.completion === 0);
             const isIdFree = m.id.includes(':free');
             return isPricingZero || isIdFree;
-        }).map((m: any) => ({
+        }).map((m: OpenRouterModel) => ({
             id: m.id,
-            name: m.name
+            name: m.name || m.id
         }));
 
         return NextResponse.json(freeModels);

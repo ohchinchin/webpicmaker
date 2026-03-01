@@ -180,20 +180,22 @@ h3 {
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
   height: 100vh;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .header h1 {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   background: linear-gradient(to right, #fff, #9d4edd);
   -webkit-background-clip: text;
   background-clip: text;
@@ -203,14 +205,35 @@ h3 {
 
 .main-content {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   flex: 1;
   min-height: 0;
-  /* for flex scrolling */
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .main-content {
+    flex-direction: column;
+    overflow-y: auto;
+    padding-bottom: 40px;
+  }
+
+  .app-container {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .visual-panel,
+  .chat-panel {
+    flex: none;
+    width: 100%;
+  }
+
+  .chat-panel {
+    height: 600px;
+  }
+
+  .difficulty-selector {
     flex-direction: column;
   }
 }
@@ -220,6 +243,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .image-container {
@@ -230,6 +254,7 @@ h3 {
   background: #000;
   border: 1px solid var(--border);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-height: 300px;
 }
 
 .image-container img {

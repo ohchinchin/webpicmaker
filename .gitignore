@@ -51,3 +51,6 @@ test-api.js
 test-json.js
 next-create.log
 temp_stage/
+
+.vercel
+.env*.local

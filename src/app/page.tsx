@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 
 type Role = 'system' | 'user' | 'assistant';
 interface Message {
@@ -16,7 +17,7 @@ interface ChatResponse {
 export default function Home() {
   const [gameState, setGameState] = useState<'opening' | 'playing' | 'gameover'>('opening');
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
-  const [model, setModel] = useState<string>('google/gemini-2.5-flash:free');
+  const [model, setModel] = useState<string>('meta-llama/llama-3.3-70b-instruct:free');
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatHistory, setChatHistory] = useState<{ sender: 'gm' | 'player', text: string }[]>([]);
   const [inputText, setInputText] = useState('');
@@ -36,7 +37,7 @@ export default function Home() {
         if (Array.isArray(data) && data.length > 0) {
           setAvailableModels(data);
           // Set to default or first available free model
-          const defaultModel = data.find(m => m.id === 'google/gemini-2.5-flash:free');
+          const defaultModel = data.find(m => m.id === 'meta-llama/llama-3.3-70b-instruct:free');
           setModel(defaultModel ? defaultModel.id : data[0].id);
         }
       })
@@ -226,11 +227,16 @@ export default function Home() {
           <div className="image-container">
             {currentImageUrl ? (
               <>
-                <img
+                <Image
                   src={currentImageUrl}
                   alt="Scenario Visual"
                   onLoad={() => setIsImageLoading(false)}
-                  style={{ opacity: isImageLoading ? 0.3 : 1 }}
+                  width={800}
+                  height={450}
+                  className="w-full h-auto rounded"
+                  style={{ opacity: isImageLoading ? 0.3 : 1, width: '100%', height: 'auto' }}
+                  priority={true}
+                  unoptimized={true}
                 />
                 {isImageLoading && (
                   <div className="image-loading-overlay">

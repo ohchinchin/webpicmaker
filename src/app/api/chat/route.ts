@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
 export async function POST(request: Request) {
-    if (!OPENROUTER_API_KEY) {
+    let apiKey = process.env.OPENROUTER_API_KEY;
+
+    // Sanitize API key: Remove UTF-8 BOM (\ufeff) and trim whitespace
+    if (apiKey) {
+        apiKey = apiKey.replace(/^\ufeff/, '').trim();
+    }
+
+    if (!apiKey) {
         return NextResponse.json({ error: 'OpenRouter API key is not configured.' }, { status: 500 });
     }
 
@@ -62,15 +67,15 @@ export async function POST(request: Request) {
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                "Authorization": `Bearer ${apiKey}`,
                 "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
                 "X-Title": "TRPG Web App",
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: model || "google/gemma-3-12b-it:free",
-                messages: formattedMessages,
-                response_format: { type: "json_object" }
+                model: model || "meta-llama/llama-3.3-70b-instruct:free",
+                messages: formattedMessages
+                // Removed response_format as it causes 500 errors with many free models
             })
         });
 
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
         let parsedContent;
         try {
             parsedContent = JSON.parse(assistantMessage);
-        } catch (err) {
+        } catch {
             console.error("Failed to parse assistant JSON:", assistantMessage);
             parsedContent = {
                 story: assistantMessage,
