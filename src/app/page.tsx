@@ -216,7 +216,7 @@ export default function Home() {
       <div className="full-center app-container">
         <div className="panel animate-fade-in" style={{ maxWidth: '600px', width: '100%' }}>
           <div className="header">
-            <h1>AI TRPG Session</h1>
+            <h1>AI TRPG Session <span style={{ fontSize: '0.9rem', verticalAlign: 'middle', opacity: 0.5, fontWeight: 'normal' }}>v0.2.0</span></h1>
             <p style={{ color: 'var(--text-muted)' }}>無限の物語が、あなたを待っている。</p>
           </div>
 
@@ -286,8 +286,9 @@ export default function Home() {
 
   return (
     <div className="app-container">
-      <div className="header" style={{ marginBottom: '16px' }}>
+      <div className="header" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
         <h1 style={{ fontSize: '1.8rem' }}>AI TRPG Session</h1>
+        <span style={{ fontSize: '0.8rem', opacity: 0.5, backgroundColor: 'var(--border)', padding: '2px 8px', borderRadius: '4px' }}>v0.2.0</span>
       </div>
 
       <div className="main-content animate-fade-in">
