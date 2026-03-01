@@ -82,7 +82,14 @@ export async function POST(request: Request) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error("OpenRouter API Error:", errorText);
-            return NextResponse.json({ error: 'Failed to fetch from OpenRouter.' }, { status: response.status });
+            let errorMessage = 'Failed to fetch from OpenRouter.';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error?.message || errorMessage;
+            } catch {
+                errorMessage = errorText || errorMessage;
+            }
+            return NextResponse.json({ error: errorMessage }, { status: response.status });
         }
 
         const data = await response.json();

@@ -25,6 +25,8 @@ export default function Home() {
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [hasChatError, setHasChatError] = useState(false);
+  const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(true);
 
   // Fallback models if primary fails (Verified Free Models - March 2026)
   const FALLBACK_MODELS = [
@@ -36,6 +38,21 @@ export default function Home() {
 
   const chatHistoryRef = useRef<HTMLDivElement>(null);
   const imageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch available free models on load
+  useEffect(() => {
+    fetch('/api/models')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAvailableModels(data);
+          const defaultModel = data.find(m => m.id === 'meta-llama/llama-3.3-70b-instruct:free');
+          setModel(defaultModel ? defaultModel.id : data[0].id);
+        }
+      })
+      .catch(err => console.error("Failed to fetch models", err))
+      .finally(() => setIsFetchingModels(false));
+  }, []);
 
   // Auto-scroll chat history
   useEffect(() => {
@@ -50,31 +67,32 @@ export default function Home() {
     setHasChatError(false);
     setChatHistory([{ sender: 'gm', text: 'システム: セッションを開始しています... 世界観を構築中...' }]);
 
-    // Send a start signal to API
     try {
-      const res = await callChatApiWithRetry([], difficulty, model);
-      if (res && res.story) {
-        setChatHistory([{ sender: 'gm', text: res.story }]);
-        setMessages([{ role: 'assistant', content: res.story }]);
-        if (res.image_prompt) {
-          updateImage(res.image_prompt);
+      const { data, error } = await callChatApiWithRetry([], difficulty, model);
+      if (data && data.story) {
+        setChatHistory([{ sender: 'gm', text: data.story }]);
+        setMessages([{ role: 'assistant', content: data.story }]);
+        if (data.image_prompt) {
+          updateImage(data.image_prompt);
         }
       } else {
         setHasChatError(true);
-        setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error: 通信に失敗しました。再試行してください。' }]);
+        const errorMsg = error || '通信に失敗しました。';
+        setChatHistory(prev => [...prev, { sender: 'gm', text: `Error: ${errorMsg} 再試行してください。` }]);
       }
     } catch (e) {
       console.error(e);
       setHasChatError(true);
-      setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error connecting to GM.' }]);
+      setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error: GMとの通信中に予期せぬエラーが発生しました。' }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const callChatApiWithRetry = async (history: Message[], diff: string, selectedModel: string, retries = 3): Promise<ChatResponse | null> => {
+  const callChatApiWithRetry = async (history: Message[], diff: string, selectedModel: string, retries = 3): Promise<{ data: ChatResponse | null, error?: string }> => {
     let currentModel = selectedModel;
     let attempts = 0;
+    let lastError = '';
 
     while (attempts < retries) {
       try {
@@ -84,24 +102,27 @@ export default function Home() {
           body: JSON.stringify({ messages: history, difficulty: diff, model: currentModel })
         });
 
+        const result = await response.json();
+
         if (response.ok) {
-          const data = await response.json();
-          return data;
+          return { data: result };
+        } else {
+          lastError = result.error || `HTTP ${response.status}`;
         }
 
-        // If failed, try fallback models on next attempt
         if (attempts < FALLBACK_MODELS.length) {
           currentModel = FALLBACK_MODELS[attempts];
           console.log(`Retrying with fallback model: ${currentModel}`);
           setModel(currentModel); 
         }
-      } catch (e) {
+      } catch (e: any) {
+        lastError = e.message || 'Network error';
         console.error(`Attempt ${attempts + 1} failed:`, e);
       }
       attempts++;
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    return null;
+    return { data: null, error: lastError };
   };
 
   const updateImage = (prompt: string) => {
@@ -112,7 +133,6 @@ export default function Home() {
     const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${Math.floor(Math.random() * 10000)}`;
     setCurrentImageUrl(url);
 
-    // Timeout: if image doesn't load in 15 seconds, clear loading state
     imageTimeoutRef.current = setTimeout(() => {
       setIsImageLoading(false);
     }, 15000);
@@ -136,21 +156,22 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const res = await callChatApiWithRetry(newMessages, difficulty, model);
-      if (res && res.story) {
-        setChatHistory(prev => [...prev, { sender: 'gm', text: res.story }]);
-        setMessages([...newMessages, { role: 'assistant', content: res.story }]);
+      const { data, error } = await callChatApiWithRetry(newMessages, difficulty, model);
+      if (data && data.story) {
+        setChatHistory(prev => [...prev, { sender: 'gm', text: data.story }]);
+        setMessages([...newMessages, { role: 'assistant', content: data.story }]);
 
-        if (res.image_prompt) {
-          updateImage(res.image_prompt);
+        if (data.image_prompt) {
+          updateImage(data.image_prompt);
         }
 
-        if (res.story.includes('ゲームオーバー') || res.story.includes('GAME OVER') || res.story.includes('死んでしまった')) {
+        if (data.story.includes('ゲームオーバー') || data.story.includes('GAME OVER') || data.story.includes('死んでしまった')) {
           setGameState('gameover');
         }
       } else {
         setHasChatError(true);
-        setChatHistory(prev => [...prev, { sender: 'gm', text: 'GMとの通信が途切れました。再試行してください。' }]);
+        const errorMsg = error || '通信が途切れました。';
+        setChatHistory(prev => [...prev, { sender: 'gm', text: `Error: ${errorMsg}` }]);
       }
     } catch (e) {
       console.error(e);
@@ -166,13 +187,15 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const res = await callChatApiWithRetry(messages, difficulty, model);
-      if (res && res.story) {
-        setChatHistory(prev => [...prev, { sender: 'gm', text: res.story }]);
-        setMessages([...messages, { role: 'assistant', content: res.story }]);
-        if (res.image_prompt) updateImage(res.image_prompt);
+      const { data, error } = await callChatApiWithRetry(messages, difficulty, model);
+      if (data && data.story) {
+        setChatHistory(prev => [...prev, { sender: 'gm', text: data.story }]);
+        setMessages([...messages, { role: 'assistant', content: data.story }]);
+        if (data.image_prompt) updateImage(data.image_prompt);
       } else {
         setHasChatError(true);
+        const errorMsg = error || '再試行に失敗しました。';
+        setChatHistory(prev => [...prev, { sender: 'gm', text: `Error: ${errorMsg}` }]);
       }
     } catch (e) {
       setHasChatError(true);
@@ -268,7 +291,6 @@ export default function Home() {
       </div>
 
       <div className="main-content animate-fade-in">
-        {/* Visual / Image Area */}
         <div className="visual-panel">
           <div className="image-container">
             {currentImageUrl ? (
@@ -322,7 +344,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Chat Area */}
         <div className="chat-panel panel">
           <div className="chat-history" ref={chatHistoryRef}>
             {chatHistory.map((msg, idx) => (
