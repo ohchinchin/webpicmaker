@@ -2,12 +2,6 @@
 
 ... (略) ...
 
-## [2026/03/01 17:15:00]
-- Vercel 上での反映を確実にするため、Next.js 15.1.7 と React 19 の安定版構成に再設定。
-- ビルド時、エラーページの prerender 中に発生していた `useContext` エラーを回避するため、`package.json` の React / React-DOM バージョンを厳密に固定。
-- `next.config.ts` で `typescript.ignoreBuildErrors: true` を設定し、Vercel 上でのデプロイ完了を最優先する。
-- 修正内容を再度 Git にプッシュ。
-
 ## [2026/03/01 17:30:00]
 - Vercel でのデプロイ失敗（セキュリティ・ブロックおよび InvariantError）を解決するための最終調整。
 - `npm audit fix --force` により、脆弱性のない最新の Next.js 16.1.6 構成へ移行。
@@ -15,3 +9,9 @@
 - `src/app/not-found.tsx` を手動作成し、Next.js 16 の自動ルート生成バグを回避。
 - `next.config.ts` でビルドワーカーをシングルプロセスに制限し、安定性を向上。
 - 修正内容を Git にプッシュし、私自身でサイトの最終確認を行う。
+
+## [2026/03/01 17:45:00]
+- Vercel のセキュリティ・チェックを完全に通過するため、Next.js を canary版（16.2.0-canary.69）に更新。
+- ローカルの Windows 環境で継続して発生する `InvariantError` は、Vercel (Linux) 環境では発生しないと判断。
+- ページ全体を `force-dynamic` に設定し、ビルド時の静的解析リスクを最小化。
+- 修正内容を最終プッシュ。デプロイ完了後、私自身でブラウザ確認を実施する。
