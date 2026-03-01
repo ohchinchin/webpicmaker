@@ -24,42 +24,35 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
   const [isImageLoading, setIsImageLoading] = useState(false);
-  const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([]);
-  const [isFetchingModels, setIsFetchingModels] = useState(true);
+  const [hasChatError, setHasChatError] = useState(false);
+
+  // Fallback models if primary fails
+  const FALLBACK_MODELS = [
+    'google/gemini-2.0-flash-001:free',
+    'deepseek/deepseek-r1:free',
+    'mistralai/mistral-7b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free'
+  ];
 
   const chatHistoryRef = useRef<HTMLDivElement>(null);
-
-  // Fetch available free models on load
-  useEffect(() => {
-    fetch('/api/models')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setAvailableModels(data);
-          // Set to default or first available free model
-          const defaultModel = data.find(m => m.id === 'meta-llama/llama-3.3-70b-instruct:free');
-          setModel(defaultModel ? defaultModel.id : data[0].id);
-        }
-      })
-      .catch(err => console.error("Failed to fetch models", err))
-      .finally(() => setIsFetchingModels(false));
-  }, []);
+  const imageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-scroll chat history
   useEffect(() => {
     if (chatHistoryRef.current) {
       chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
     }
-  }, [chatHistory]);
+  }, [chatHistory, isLoading]);
 
   const startGame = async () => {
     setGameState('playing');
     setIsLoading(true);
+    setHasChatError(false);
     setChatHistory([{ sender: 'gm', text: 'システム: セッションを開始しています... 世界観を構築中...' }]);
 
     // Send a start signal to API
     try {
-      const res = await callChatApi([], difficulty, model);
+      const res = await callChatApiWithRetry([], difficulty, model);
       if (res && res.story) {
         setChatHistory([{ sender: 'gm', text: res.story }]);
         setMessages([{ role: 'assistant', content: res.story }]);
@@ -67,34 +60,62 @@ export default function Home() {
           updateImage(res.image_prompt);
         }
       } else {
-        setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error: Failed to generate starting scenario.' }]);
+        setHasChatError(true);
+        setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error: 通信に失敗しました。再試行してください。' }]);
       }
     } catch (e) {
       console.error(e);
+      setHasChatError(true);
       setChatHistory(prev => [...prev, { sender: 'gm', text: 'Error connecting to GM.' }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const callChatApi = async (history: Message[], diff: string, selectedModel: string): Promise<ChatResponse | null> => {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: history, difficulty: diff, model: selectedModel })
-    });
+  const callChatApiWithRetry = async (history: Message[], diff: string, selectedModel: string, retries = 3): Promise<ChatResponse | null> => {
+    let currentModel = selectedModel;
+    let attempts = 0;
 
-    if (!response.ok) return null;
-    return await response.json();
+    while (attempts < retries) {
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: history, difficulty: diff, model: currentModel })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        }
+
+        // If failed, try fallback models on next attempt
+        if (attempts < FALLBACK_MODELS.length) {
+          currentModel = FALLBACK_MODELS[attempts];
+          console.log(`Retrying with fallback model: ${currentModel}`);
+          setModel(currentModel); 
+        }
+      } catch (e) {
+        console.error(`Attempt ${attempts + 1} failed:`, e);
+      }
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    return null;
   };
 
   const updateImage = (prompt: string) => {
     setIsImageLoading(true);
+    if (imageTimeoutRef.current) clearTimeout(imageTimeoutRef.current);
+
     const encodedPrompt = encodeURIComponent('detailed, high quality, ' + prompt);
-    // Pollinations generates the image directly from the URL.
-    // Adding a random seed prevents browser caching if prompt is similar.
     const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${Math.floor(Math.random() * 10000)}`;
     setCurrentImageUrl(url);
+
+    // Timeout: if image doesn't load in 15 seconds, clear loading state
+    imageTimeoutRef.current = setTimeout(() => {
+      setIsImageLoading(false);
+    }, 15000);
   };
 
   const handleSendMessage = async () => {
@@ -102,6 +123,7 @@ export default function Home() {
 
     const userText = inputText.trim();
     setInputText('');
+    setHasChatError(false);
 
     setChatHistory(prev => [...prev, { sender: 'player', text: userText }]);
 
@@ -114,7 +136,7 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const res = await callChatApi(newMessages, difficulty, model);
+      const res = await callChatApiWithRetry(newMessages, difficulty, model);
       if (res && res.story) {
         setChatHistory(prev => [...prev, { sender: 'gm', text: res.story }]);
         setMessages([...newMessages, { role: 'assistant', content: res.story }]);
@@ -123,13 +145,37 @@ export default function Home() {
           updateImage(res.image_prompt);
         }
 
-        // Check for Game Over keywords (Simple logic)
         if (res.story.includes('ゲームオーバー') || res.story.includes('GAME OVER') || res.story.includes('死んでしまった')) {
           setGameState('gameover');
         }
+      } else {
+        setHasChatError(true);
+        setChatHistory(prev => [...prev, { sender: 'gm', text: 'GMとの通信が途切れました。再試行してください。' }]);
       }
     } catch (e) {
       console.error(e);
+      setHasChatError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (isLoading) return;
+    setHasChatError(false);
+    setIsLoading(true);
+
+    try {
+      const res = await callChatApiWithRetry(messages, difficulty, model);
+      if (res && res.story) {
+        setChatHistory(prev => [...prev, { sender: 'gm', text: res.story }]);
+        setMessages([...messages, { role: 'assistant', content: res.story }]);
+        if (res.image_prompt) updateImage(res.image_prompt);
+      } else {
+        setHasChatError(true);
+      }
+    } catch (e) {
+      setHasChatError(true);
     } finally {
       setIsLoading(false);
     }
@@ -231,6 +277,7 @@ export default function Home() {
                   src={currentImageUrl}
                   alt="Scenario Visual"
                   onLoad={() => setIsImageLoading(false)}
+                  onError={() => setIsImageLoading(false)}
                   width={800}
                   height={450}
                   className="w-full h-auto rounded"
@@ -310,14 +357,25 @@ export default function Home() {
               disabled={isLoading || gameState === 'gameover'}
               style={{ flex: 1, resize: 'none', height: '60px' }}
             />
-            <button
-              className="btn-primary"
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputText.trim() || gameState === 'gameover'}
-              style={{ height: '60px', padding: '0 24px' }}
-            >
-              Action
-            </button>
+            {hasChatError ? (
+              <button
+                className="btn-primary"
+                onClick={handleRetry}
+                disabled={isLoading}
+                style={{ height: '60px', padding: '0 24px', background: 'linear-gradient(135deg, #ff4d4f, #ff7875)' }}
+              >
+                Retry
+              </button>
+            ) : (
+              <button
+                className="btn-primary"
+                onClick={handleSendMessage}
+                disabled={isLoading || !inputText.trim() || gameState === 'gameover'}
+                style={{ height: '60px', padding: '0 24px' }}
+              >
+                Action
+              </button>
+            )}
           </div>
         </div>
       </div>
